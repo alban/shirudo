@@ -12,8 +12,10 @@ The tree ships packages under :src:`upatches/`: ``kernel-obs``, a
 complete observability package with arena tables, serializers, decoders
 and generated ``.rodata``, in ``kernel-cve`` three small CVE
 detectors exported from a mitigation campaign and one CVE mitigation,
-each a package of its own, and ``app-sandbox``, which enforces with
-policy labels and generated ``.rodata``.
+each a package of its own, ``app-sandbox``, which enforces with
+policy labels and generated ``.rodata``, and
+``cve-2020-14343-pyyaml-exec-block``, which reads a Python stack to
+refuse what one library starts.
 
 kernel-obs
 ----------
@@ -186,6 +188,39 @@ fails the build for rules without a policy table. The package's
 cover. ``t9114-app-sandbox`` takes the package from its sources to a
 node and back (:ref:`testing-sandbox`), and :src:`tools/put-shields`
 publishes it with the shields of ``kernel-cve``.
+
+cve-2020-14343-pyyaml-exec-block
+--------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Item
+     - Content
+   * - Package
+     - ``cve-2020-14343-pyyaml-exec-block``, from
+       :src:`upatches/cve-2020-14343-pyyaml-exec-block/Beefile`
+   * - upatch
+     - ``cve-2020-14343-pyyaml-exec-block``, built from
+       ``cve-2020-14343-pyyaml-exec-block.bpf.c``: one
+       ``lsm.s/bprm_check_security`` program and no state of its own
+   * - Policy labels
+     - one ``[[upatches.policy]]`` table, ``python3.14``, bit ``0x100``
+       on ``/usr/bin/python3.14``
+   * - Tree entry
+     - ``cve-2020-14343-pyyaml-exec-block``, without a selector, with
+       ``fixes`` naming CVE-2020-14343, which it contains rather than
+       closes
+
+At an ``execve()`` from a task with the ``python3.14`` bit, the program
+reads the Python stack of the thread that started it from the task's
+memory with ``bpf_copy_from_user()``, through the addresses and offsets
+of one Python build, and refuses with ``EACCES`` when a frame runs code
+of PyYAML's ``yaml/constructor.py``, where a payload of the CVE calls
+the function it names. The package's ``README.md`` says which build it
+reads, how to try it with the report service of its ``demo/``, and the
+payloads it does not stop.
 
 Related
 -------
