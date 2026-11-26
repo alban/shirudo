@@ -12,8 +12,10 @@ The tree ships packages under :src:`upatches/`: ``kernel-obs``, a
 complete observability package with arena tables, serializers, decoders
 and generated ``.rodata``, in ``kernel-cve`` three small CVE
 detectors exported from a mitigation campaign and one CVE mitigation,
-each a package of its own, and ``app-sandbox``, which enforces with
-policy labels and generated ``.rodata``.
+each a package of its own, ``app-sandbox``, which enforces with
+policy labels and generated ``.rodata``, and
+``cve-2020-14343-pyyaml-exec-block``, which reads a Python stack to
+refuse what one library starts.
 
 kernel-obs
 ----------
@@ -186,6 +188,46 @@ fails the build for rules without a policy table. The package's
 cover. ``t9114-app-sandbox`` takes the package from its sources to a
 node and back (:ref:`testing-sandbox`), and :src:`tools/put-shields`
 publishes it with the shields of ``kernel-cve``.
+
+cve-2020-14343-pyyaml-exec-block
+--------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Item
+     - Content
+   * - Package
+     - ``cve-2020-14343-pyyaml-exec-block``, from
+       :src:`upatches/cve-2020-14343-pyyaml-exec-block/Beefile`
+   * - upatch
+     - ``cve-2020-14343-pyyaml-exec-block``, built from
+       ``cve-2020-14343-pyyaml-exec-block.bpf.c``: ``lsm.s/mmap_file``,
+       ``lsm/mmap_backing_file``, ``lsm/task_alloc``,
+       ``lsm.s/bprm_committed_creds`` and ``lsm.s/bprm_check_security``
+       programs, with an inode storage map for what each executable
+       file holds and a task storage map for the tasks that run Python
+   * - Policy labels
+     - none: the upatch finds the Python interpreter in the files that
+       tasks map executable
+   * - Tree entry
+     - ``cve-2020-14343-pyyaml-exec-block``, without a selector, with
+       ``fixes`` naming CVE-2020-14343, which it contains rather than
+       closes
+
+When a task maps a file executable, the upatch reads the ELF file with
+``bpf_dynptr_from_file()`` for ``_PyRuntime`` and ``PyCode_Type`` and
+for the offsets of CPython's ``_Py_DebugOffsets``, so that it knows any
+build of CPython 3.13 to 3.15, and marks the task. At an ``execve()``
+from a marked task, it finds where the file is mapped with the
+``task_vma`` iterator, reads the Python stacks of the thread that
+started the program, in every interpreter, with
+``bpf_copy_from_user()``, and refuses with
+``EACCES`` when a frame runs code of PyYAML's ``yaml/constructor.py``,
+where a payload of the CVE calls the function it names. The package's
+``README.md`` says which builds it reads, how to try it with the report
+service of its ``demo/``, and the payloads it does not stop.
 
 Related
 -------
